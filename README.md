@@ -37,7 +37,18 @@ Each has its own damage, range falloff, spread, aim spread, recoil, fire rate, m
 
 **Locker (character editor):** 6 skin tones, 6 hair/headgear styles (spiky, buzz, mohawk, cap, helmet, beanie), 6 hair colors, 9 shirt colors, 6 pants colors, gear (goggles, headphones, jetpack, bandana), 3 saved outfit slots, Random, a Wave emote and a spinning preview. Bots get random outfits.
 
-**Bots** look like **skinwalkers** by default: tall, hunched gray creatures with a bone skull, antlers, glowing red eyes and a fur mantle (spooky, no gore). They growl when they spot you. Settings → *Skinwalker bots* switches back to cartoon bots. Bots also pathfind across stairs, bridges and catwalks; avoid walking off island edges; lead moving targets with projectile weapons and arc for drop; aim rockets at feet; charge the bow; keep each weapon's best range; fight only enemies in team modes.
+**Bots** look like **skinwalkers** by default: tall, hunched gray creatures with a bone skull, antlers, glowing red eyes and a fur mantle (spooky, no gore). They growl when they spot you. Settings → *Skinwalker bots* switches back to cartoon bots. Each match mixes these types (same health and hitbox, slightly different play):
+
+| Type | Look | Plays |
+|---|---|---|
+| Stag Walker | Antlers, red eyes, fur cape | The all-rounder |
+| Wolf Walker | Pointed ears, long snout, yellow eyes, shaggy fur | 18% faster, rushes in close |
+| Crow Walker | Black feathers, beak, crest, purple eyes | Jumps a lot, harder to hit |
+| Pale Walker | See-through ghostly white, head spikes, cyan eyes | Slightly faster, keeps distance |
+| Ram Walker | Curled horns, wool, orange eyes | Charges in close |
+| Bog Walker | Mossy green, mossy antlers, green eyes | Slower, but aims better |
+
+Bots also pathfind across stairs, bridges and catwalks; avoid walking off island edges; lead moving targets with projectile weapons and arc for drop; aim rockets at feet; charge the bow; keep each weapon's best range; fight only enemies in team modes.
 
 **Also:** movement (sprint, double jump, slide, dash, crouch, air control that keeps momentum), health regen, spawn shields, team-side spawns, teammate markers visible through walls, colorblind enemy outlines, hit markers, damage numbers, kill feed, touch / keyboard + mouse / controller, saved settings and stats.
 

@@ -66,6 +66,16 @@ const server = http.createServer((req, res) => {
     const a = await page.evaluate(() => { const b = window.__blast; b.startMatch('duel'); return !!b.fighters[1].mesh.skinwalker; });
     const c = await page.evaluate(() => { const b = window.__blast; b.store.settings.spookyBots = false; b.startMatch('duel'); const r = !b.fighters[1].mesh.skinwalker; b.store.settings.spookyBots = true; return r; });
     check(a && c, 'bots are skinwalkers by default, cartoon when switched off');
+    const kinds = await page.evaluate(() => {
+      const b = window.__blast;
+      const built = window.BA.SKINWALKER_ORDER.map((v) => window.BA.buildSkinwalker({ variant: v }).variant.id);
+      b.startMatch('ffa');
+      const bots = b.fighters.filter((f) => !f.isPlayer);
+      return { built, types: [...new Set(bots.map((f) => f.mesh.variant.id))], names: bots.map((f) => f.name) };
+    });
+    console.log('    skinwalker types in FFA:', kinds.names.join(', '));
+    check(kinds.built.length === 6 && new Set(kinds.built).size === 6, 'all 6 skinwalker types build');
+    check(kinds.types.length === 5, 'a 5-bot match gets 5 different skinwalker types');
   }
 
   // --- 3v3 on Sky Islands: bots fight, fall-offs are handled ---
