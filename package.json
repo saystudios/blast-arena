@@ -1,0 +1,14 @@
+{
+  "name": "blast-arena",
+  "version": "0.3.0",
+  "private": true,
+  "description": "Blast Arena: cartoon 3D arena blaster for iPhone, iPad and desktop.",
+  "author": "Say Studios LLC",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "start": "node server/index.js",
+    "test": "node tests/core.test.js && node tests/server.test.js",
+    "smoke": "node tests/smoke.js",
+    "e2e": "node tests/online-e2e.js"
+  }
+}
