@@ -69,6 +69,7 @@ button:disabled { opacity: 0.4; cursor: default; }
   transform: skewX(-8deg); transform-origin: left; letter-spacing: 0.01em;
 }
 .title span { color: var(--blaze); }
+.ver { margin: 4px 0 0; font-size: 11px; color: var(--muted); letter-spacing: 0.06em; }
 .tag { margin: 12px 0 0; font-size: 15px; color: var(--muted); }
 .label { font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; margin: 0 0 6px; color: var(--muted); font-weight: 800; }
 .seg { display: grid; gap: 8px; }
@@ -369,6 +370,7 @@ details summary { cursor: pointer; color: var(--muted); font-size: 13px; min-hei
     <div>
       <h1 class="title">BEN<br><span>ZONE</span></h1>
       <p class="tag">14 blasters. 4 arenas. Team battles vs bots and online.</p>
+      <p class="ver">Version 0.4.2 · Skinwalker bots</p>
     </div>
     <div class="card panel" style="max-width:none">
       <div><p class="label">Mode</p><div class="seg three" id="modePick"></div></div>
@@ -527,10 +529,10 @@ details summary { cursor: pointer; color: var(--muted); font-size: 13px; min-hei
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="src/core.js"></script>
-<script src="src/characters.js"></script>
-<script src="src/maps.js"></script>
-<script src="src/online.js"></script>
-<script src="src/game.js"></script>
+<script src="src/core.js?v=0.4.2"></script>
+<script src="src/characters.js?v=0.4.2"></script>
+<script src="src/maps.js?v=0.4.2"></script>
+<script src="src/online.js?v=0.4.2"></script>
+<script src="src/game.js?v=0.4.2"></script>
 </body>
 </html>
