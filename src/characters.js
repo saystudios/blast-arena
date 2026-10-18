@@ -187,6 +187,115 @@
     return handles;
   }
 
+  /**
+   * Skinwalker bot: a tall, hunched, gaunt creature with a bone-white animal skull, antlers,
+   * glowing red eyes, a shaggy fur mantle, long clawed arms and bent back-legs.
+   * Spooky, not gory. Fits the same hitbox as the cartoon bots (head near 1.4 m).
+   * Returns the same handles as buildCharacter so the game animates it the same way.
+   */
+  function buildSkinwalker(opts) {
+    opts = opts || {};
+    const g = new THREE.Group();
+    const add = (mesh, x, y, z, parent) => { mesh.position.set(x, y, z); mesh.castShadow = true; (parent || g).add(mesh); return mesh; };
+    const hide = std(0x3a3d44, { roughness: 0.9 });          // gray, leathery skin
+    const fur = std(0x2b2018, { roughness: 1 });              // dark shaggy pelt
+    const bone = std(0xe6dcc6, { roughness: 0.55 });          // skull and antlers
+    const dark = std(0x0b0b0e, { roughness: 1 });
+    const glow = new THREE.MeshBasicMaterial({ color: 0xff2a1a });
+    const skinMat = new THREE.MeshStandardMaterial({ color: 0x3a3d44, roughness: 0.9, emissive: 0xffffff, emissiveIntensity: 0 });
+
+    // Legs: thigh angled forward, shin angled back (bent like an animal's hind leg)
+    const feet = [];
+    for (const sx of [-1, 1]) {
+      const thigh = add(new THREE.Mesh(geo('swThigh', () => new THREE.CylinderGeometry(0.075, 0.055, 0.5, 8)), hide), sx * 0.16, 0.78, 0.02);
+      thigh.rotation.x = 0.4;
+      const shin = add(new THREE.Mesh(geo('swShin', () => new THREE.CylinderGeometry(0.05, 0.035, 0.56, 8)), hide), sx * 0.16, 0.32, 0.1);
+      shin.rotation.x = -0.45;
+      const foot = add(new THREE.Mesh(geo('swFoot', () => new THREE.BoxGeometry(0.11, 0.07, 0.3)), hide), sx * 0.16, 0.09, -0.04);
+      for (const cx of [-0.035, 0.035]) {
+        const toe = new THREE.Mesh(geo('swToe', () => new THREE.ConeGeometry(0.02, 0.1, 5)), bone);
+        toe.rotation.x = -Math.PI / 2; toe.position.set(cx, -0.01, -0.19); foot.add(toe);
+      }
+      feet.push(foot);
+    }
+
+    // Hunched torso with a ridge of spine bumps
+    add(new THREE.Mesh(geo('swPelvis', () => new THREE.SphereGeometry(0.16, 10, 8)), hide), 0, 1.02, 0.02);
+    const torso = add(new THREE.Mesh(geo('swTorso', () => new THREE.CylinderGeometry(0.21, 0.13, 0.72, 10)), skinMat), 0, 1.3, -0.1);
+    torso.rotation.x = 0.5;
+    for (let i = 0; i < 5; i++) {
+      const bump = add(new THREE.Mesh(geo('swSpine', () => new THREE.SphereGeometry(0.045, 6, 5)), bone), 0, 1.08 + i * 0.12, 0.1 - i * 0.07);
+      bump.scale.set(1, 0.7, 1);
+    }
+    for (let i = 0; i < 3; i++) {
+      const rib = add(new THREE.Mesh(geo('swRib', () => new THREE.TorusGeometry(0.17, 0.012, 4, 14, Math.PI)), bone), 0, 1.22 + i * 0.1, -0.16 - i * 0.05);
+      rib.rotation.set(0.5, 0, Math.PI);
+    }
+
+    // Shaggy fur mantle over the shoulders with ragged strands
+    const mantle = add(new THREE.Mesh(geo('swMantle', () => new THREE.ConeGeometry(0.42, 0.42, 10, 1, true)), fur), 0, 1.5, -0.12);
+    mantle.material = std(0x2b2018, { roughness: 1, side: THREE.DoubleSide });
+    for (let i = 0; i < 10; i++) {
+      const a = (i / 10) * Math.PI * 2;
+      const strand = add(new THREE.Mesh(geo('swStrand', () => new THREE.ConeGeometry(0.06, 0.32, 4)), fur), Math.cos(a) * 0.38, 1.24, -0.12 + Math.sin(a) * 0.38);
+      strand.rotation.set(Math.sin(a) * 0.5 + Math.PI, 0, -Math.cos(a) * 0.5);
+    }
+
+    // Skull head: long muzzle, dark eye sockets, glowing eyes, small fangs, antlers
+    const head = new THREE.Group(); head.position.set(0, 1.42, -0.34); g.add(head);
+    const skull = add(new THREE.Mesh(geo('swSkull', () => new THREE.SphereGeometry(0.19, 14, 10)), bone), 0, 0.02, 0, head);
+    skull.scale.set(0.85, 0.9, 1.25);
+    add(new THREE.Mesh(geo('swSnout', () => new THREE.BoxGeometry(0.14, 0.11, 0.26)), bone), 0, -0.04, -0.24, head);
+    add(new THREE.Mesh(geo('swNose', () => new THREE.BoxGeometry(0.08, 0.05, 0.04)), dark), 0, -0.01, -0.38, head);
+    for (const sx of [-1, 1]) {
+      add(new THREE.Mesh(geo('swSocket', () => new THREE.SphereGeometry(0.05, 8, 6)), dark), sx * 0.075, 0.06, -0.17, head);
+      add(new THREE.Mesh(geo('swEye', () => new THREE.SphereGeometry(0.026, 8, 6)), glow), sx * 0.075, 0.06, -0.205, head);
+      const fang = add(new THREE.Mesh(geo('swFang', () => new THREE.ConeGeometry(0.014, 0.06, 4)), bone), sx * 0.045, -0.12, -0.33, head);
+      fang.rotation.x = Math.PI;
+      // antler: main beam sweeping up and back, with two tines
+      const beam = add(new THREE.Mesh(geo('swAntler', () => new THREE.CylinderGeometry(0.018, 0.028, 0.42, 6)), bone), sx * 0.12, 0.26, 0.04, head);
+      beam.rotation.set(-0.35, 0, -sx * 0.55);
+      const tine1 = add(new THREE.Mesh(geo('swTine', () => new THREE.CylinderGeometry(0.012, 0.018, 0.18, 5)), bone), sx * 0.2, 0.33, -0.04, head);
+      tine1.rotation.set(0.5, 0, -sx * 0.1);
+      const tine2 = add(new THREE.Mesh(geo('swTine', () => new THREE.CylinderGeometry(0.012, 0.018, 0.18, 5)), bone), sx * 0.26, 0.45, 0.06, head);
+      tine2.rotation.set(-0.2, 0, -sx * 0.9);
+    }
+
+    // Long arms hanging low, ending in clawed hands
+    const hands = [];
+    for (const sx of [-1, 1]) {
+      const upper = add(new THREE.Mesh(geo('swUpper', () => new THREE.CylinderGeometry(0.045, 0.035, 0.52, 7)), hide), sx * 0.3, 1.32, -0.2);
+      upper.rotation.set(0.35, 0, sx * 0.12);
+      const fore = add(new THREE.Mesh(geo('swFore', () => new THREE.CylinderGeometry(0.035, 0.028, 0.5, 7)), hide), sx * 0.34, 0.92, -0.36);
+      fore.rotation.set(0.6, 0, 0);
+      const hand = add(new THREE.Mesh(geo('swHand', () => new THREE.SphereGeometry(0.055, 8, 6)), hide), sx * 0.36, 0.72, -0.5);
+      for (let c = -1; c <= 1; c++) {
+        const claw = new THREE.Mesh(geo('swClaw', () => new THREE.ConeGeometry(0.012, 0.13, 4)), bone);
+        claw.position.set(c * 0.025, -0.06, -0.04); claw.rotation.x = Math.PI * 0.85; hand.add(claw);
+      }
+      hands.push(hand);
+    }
+
+    const outline = new THREE.Mesh(geo('swOutline', () => new THREE.CylinderGeometry(0.4, 0.4, 1.9, 12)), std(0xffd60a, { side: THREE.BackSide, emissive: 0xffd60a, emissiveIntensity: 0.6 }));
+    outline.position.y = 0.95; outline.visible = false; g.add(outline);
+    const teamBand = new THREE.Mesh(geo('swBand', () => new THREE.TorusGeometry(0.2, 0.04, 8, 20)), std(0xffffff));
+    teamBand.rotation.x = Math.PI / 2 - 0.5; teamBand.position.set(0, 1.12, -0.02); teamBand.visible = false; g.add(teamBand);
+
+    const gun = buildGun(opts.weapon || 'laser');
+    gun.position.set(0.36, 0.84, -0.5); g.add(gun);
+    const marker = new THREE.Mesh(geo('marker', () => new THREE.OctahedronGeometry(0.15)), new THREE.MeshBasicMaterial({ color: 0xff3b1f }));
+    marker.position.y = 2.2; marker.scale.y = 1.4; g.add(marker);
+
+    const handles = { group: g, shirtMat: skinMat, feet, hands, marker, outline, teamBand, gun, tip: gun.userData.tip, outfit: null, skinwalker: true, head };
+    handles.setWeapon = (id) => {
+      const old = handles.gun, next = buildGun(id);
+      next.position.copy(old.position); g.remove(old); g.add(next);
+      handles.gun = next; handles.tip = next.userData.tip;
+    };
+    return handles;
+  }
+
+  BA.buildSkinwalker = buildSkinwalker;
   BA.OUTFIT = OUTFIT;
   BA.DEFAULT_OUTFIT = DEFAULT_OUTFIT;
   BA.randomOutfit = randomOutfit;

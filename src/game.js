@@ -37,7 +37,7 @@
     settings: {
       sens: 1, touchSens: 1, invertY: false, fov: 80, difficulty: 'normal', sfx: 0.7, cbMode: false, lefty: false,
       mode: 'duel', map: 'neon', loadout: ['laser', 'scatter'], outfit: BA.DEFAULT_OUTFIT, outfits: [null, null, null],
-      quickChat: true, allowInvites: true, server: ''
+      quickChat: true, allowInvites: true, server: '', spookyBots: true
     },
     stats: { matches: 0, wins: 0, kills: 0, deaths: 0, shots: 0, hits: 0, bestPractice: 0 }
   };
@@ -134,6 +134,7 @@
       win() { [523, 659, 784, 1047].forEach((f, i) => tone('square', f, f, 0.22, 0.08, i * 0.12)); },
       lose() { [392, 330, 262].forEach((f, i) => tone('triangle', f, f * 0.98, 0.26, 0.1, i * 0.16)); },
       pop() { tone('sine', 600, 1400, 0.08, 0.12); noise(0.06, 0.15, 3000, 0, 2); },
+      growl(vol) { tone('sawtooth', 95, 55, 0.7, 0.07 * vol); tone('sawtooth', 101, 58, 0.7, 0.05 * vol); noise(0.6, 0.12 * vol, 220, 0, 2); tone('sine', 1400, 900, 0.25, 0.02 * vol, 0.45); },
       click() { tone('sine', 900, 1100, 0.04, 0.05); }
     };
   })();
@@ -566,8 +567,15 @@
     };
     f.weaponIds.forEach((id) => { f.ammo[id] = C.WEAPONS[id].mag; });
     if (!f.isPlayer) {
-      f.mesh = BA.buildCharacter(o.outfit || BA.randomOutfit(), { weapon: f.weaponIds[0] });
-      f.color = BA.OUTFIT.shirts[f.mesh.outfit.shirt];
+      // Offline bots are skinwalkers unless turned off in Settings; online players keep their own outfits.
+      if (o.bot && store.settings.spookyBots && BA.buildSkinwalker) {
+        f.mesh = BA.buildSkinwalker({ weapon: f.weaponIds[0] });
+        f.color = 0xe6dcc6;
+      } else {
+        f.mesh = BA.buildCharacter(o.outfit || BA.randomOutfit(), { weapon: f.weaponIds[0] });
+        f.color = BA.OUTFIT.shirts[f.mesh.outfit.shirt];
+      }
+      f.mesh.gunZ = f.mesh.gun.position.z;
       if (f.team) { f.mesh.teamBand.visible = true; f.mesh.teamBand.material = new THREE.MeshStandardMaterial({ color: TEAM_COLOR[f.team], emissive: TEAM_COLOR[f.team], emissiveIntensity: 0.4 }); }
       scene.add(f.mesh.group);
     }
@@ -732,7 +740,7 @@
     const names = BOT_NAMES.slice().sort(() => Math.random() - 0.5);
     for (let i = 0; i < nBots; i++) {
       const weapon = C.WEAPON_ORDER[Math.floor(Math.random() * C.WEAPON_ORDER.length)];
-      fighters.push(makeFighter({ id: 'bot' + i, name: names[i % names.length], team: teamOf ? teamOf['bot' + i] : null, weaponIds: [weapon] }));
+      fighters.push(makeFighter({ id: 'bot' + i, name: names[i % names.length], team: teamOf ? teamOf['bot' + i] : null, weaponIds: [weapon], bot: true }));
     }
     match = C.createMatch(modeId, ids, teamOf);
     fighters.forEach(respawn);
@@ -1562,6 +1570,11 @@
       seen = dist < 60 && hasLOS(eye, aim);
     }
     if (seen) { ai.seenT += dt; ai.lastSeen.copy(t.pos); ai.hasLast = true; } else ai.seenT = 0;
+    if (seen && !ai.wasSeen && t.isPlayer && b.mesh && b.mesh.skinwalker && state.time - (state.lastGrowl || -99) > 6) {
+      state.lastGrowl = state.time;
+      Sfx.growl(clamp(1 - dist / 35, 0.15, 0.7));
+    }
+    ai.wasSeen = seen;
 
     let mx = 0, mz = 0, wantYaw = b.yaw, wantPitch = 0;
     if (seen) {
@@ -1696,7 +1709,13 @@
     m.marker.position.y = 2.2 + Math.sin(state.time * 3) * 0.06;
     m.outline.visible = cb;
     // bow draw pose
-    m.gun.position.z = b.ai.charge >= 0 ? -0.22 : -0.32;
+    m.gun.position.z = (m.gunZ != null ? m.gunZ : -0.32) + (b.ai.charge >= 0 ? 0.1 : 0);
+    if (m.skinwalker) {
+      // Unsettling twitchy head tilt and a slow sway
+      const id = b.id.length * 1.7;
+      m.head.rotation.z = Math.sin(state.time * 1.3 + id) * 0.18 + (Math.sin(state.time * 9 + id) > 0.97 ? 0.35 : 0);
+      m.head.rotation.x = Math.sin(state.time * 0.9 + id) * 0.08;
+    }
   }
 
   // ======================================================================
@@ -1893,6 +1912,7 @@
   bindToggle('setCb', 'cbMode');
   bindToggle('setLefty', 'lefty', applyLefty);
   bindToggle('setQuickChat', 'quickChat');
+  bindToggle('setSpooky', 'spookyBots');
   bindToggle('setInvites', 'allowInvites', () => { if (BA.net) BA.net.send({ t: 'profile', allowInvites: store.settings.allowInvites }); });
   applyLefty();
 

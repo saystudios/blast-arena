@@ -61,6 +61,13 @@ const server = http.createServer((req, res) => {
     check(same, 'server collision matches the browser on all 4 maps');
   }
 
+  // --- Bots are skinwalkers by default; the Settings switch brings back cartoon bots ---
+  {
+    const a = await page.evaluate(() => { const b = window.__blast; b.startMatch('duel'); return !!b.fighters[1].mesh.skinwalker; });
+    const c = await page.evaluate(() => { const b = window.__blast; b.store.settings.spookyBots = false; b.startMatch('duel'); const r = !b.fighters[1].mesh.skinwalker; b.store.settings.spookyBots = true; return r; });
+    check(a && c, 'bots are skinwalkers by default, cartoon when switched off');
+  }
+
   // --- 3v3 on Sky Islands: bots fight, fall-offs are handled ---
   await page.evaluate(() => { const b = window.__blast; b.store.settings.map = 'sky'; b.startMatch('team3'); });
   await page.waitForTimeout(3200 + 14000);
