@@ -188,21 +188,44 @@
   }
 
   /**
-   * Skinwalker bot: a tall, hunched, gaunt creature with a bone-white animal skull, antlers,
-   * glowing red eyes, a shaggy fur mantle, long clawed arms and bent back-legs.
+   * Skinwalker types. Same hitbox and health for all; small behavior differences so each plays differently.
+   * look: colors and parts. play: multipliers the bot AI applies (speed, jumping, preferred range, aim error).
+   */
+  const SKINWALKERS = {
+    stag:  { id: 'stag',  name: 'Stag Walker',  short: 'Stag',  hide: 0x3a3d44, fur: 0x2b2018, bone: 0xe6dcc6, eye: 0xff2a1a, head: 'antlers', snout: 0.26, mantle: 'fur',
+             play: { speed: 1, jump: 1, range: 1, aim: 1 }, blurb: 'Antlers and red eyes. The classic.' },
+    wolf:  { id: 'wolf',  name: 'Wolf Walker',  short: 'Wolf',  hide: 0x4a4038, fur: 0x5c4b3a, bone: 0xd9cfb8, eye: 0xffd21a, head: 'ears', snout: 0.36, mantle: 'shaggy',
+             play: { speed: 1.18, jump: 1, range: 0.75, aim: 1.1 }, blurb: 'Fast hunter that rushes you.' },
+    crow:  { id: 'crow',  name: 'Crow Walker',  short: 'Crow',  hide: 0x1c1c22, fur: 0x0d0d12, bone: 0x2b2b33, eye: 0xb26bff, head: 'crest', snout: 0, beak: 0xc9b48a, mantle: 'feathers',
+             play: { speed: 1, jump: 2.4, range: 1.1, aim: 1 }, blurb: 'Feathered and jumpy. Hard to pin down.' },
+    pale:  { id: 'pale',  name: 'Pale Walker',  short: 'Pale',  hide: 0xd9dde4, fur: 0xbfc4cc, bone: 0xffffff, eye: 0x4ff0ff, head: 'spikes', snout: 0.18, mantle: 'none', ghost: true,
+             play: { speed: 1.05, jump: 1, range: 1.2, aim: 0.95 }, blurb: 'Ghostly, see-through and quiet.' },
+    ram:   { id: 'ram',   name: 'Ram Walker',   short: 'Ram',   hide: 0x5b4a3c, fur: 0xd8cdb4, bone: 0xe6dcc6, eye: 0xff8a1a, head: 'horns', snout: 0.22, mantle: 'wool',
+             play: { speed: 1.05, jump: 0.7, range: 0.6, aim: 1.05 }, blurb: 'Curled horns. Charges in close.' },
+    bog:   { id: 'bog',   name: 'Bog Walker',   short: 'Bog',   hide: 0x2f3d2a, fur: 0x3f5a2a, bone: 0xb8c49a, eye: 0x7dff3a, head: 'antlers', snout: 0.26, mantle: 'moss',
+             play: { speed: 0.88, jump: 0.8, range: 1.25, aim: 0.85 }, blurb: 'Slow and mossy, but a sharp shot.' }
+  };
+  const SKINWALKER_ORDER = ['stag', 'wolf', 'crow', 'pale', 'ram', 'bog'];
+
+  /**
+   * Builds a skinwalker bot: tall, hunched and gaunt with an animal skull, glowing eyes and long clawed arms.
+   * opts: { variant: one of SKINWALKER_ORDER (random if omitted), weapon }
    * Spooky, not gory. Fits the same hitbox as the cartoon bots (head near 1.4 m).
    * Returns the same handles as buildCharacter so the game animates it the same way.
    */
   function buildSkinwalker(opts) {
     opts = opts || {};
+    const V = SKINWALKERS[opts.variant] || SKINWALKERS[SKINWALKER_ORDER[Math.floor(Math.random() * SKINWALKER_ORDER.length)]];
     const g = new THREE.Group();
     const add = (mesh, x, y, z, parent) => { mesh.position.set(x, y, z); mesh.castShadow = true; (parent || g).add(mesh); return mesh; };
-    const hide = std(0x3a3d44, { roughness: 0.9 });          // gray, leathery skin
-    const fur = std(0x2b2018, { roughness: 1 });              // dark shaggy pelt
-    const bone = std(0xe6dcc6, { roughness: 0.55 });          // skull and antlers
+    // Ghostly types get their own see-through materials; others share cached ones.
+    const mat = (color, extra) => (V.ghost ? new THREE.MeshStandardMaterial(Object.assign({ color, roughness: 0.6, transparent: true, opacity: 0.62 }, extra || {})) : std(color, Object.assign({ roughness: 0.9 }, extra || {})));
+    const hide = mat(V.hide);
+    const fur = mat(V.fur, { roughness: 1 });
+    const bone = mat(V.bone, { roughness: 0.55 });
     const dark = std(0x0b0b0e, { roughness: 1 });
-    const glow = new THREE.MeshBasicMaterial({ color: 0xff2a1a });
-    const skinMat = new THREE.MeshStandardMaterial({ color: 0x3a3d44, roughness: 0.9, emissive: 0xffffff, emissiveIntensity: 0 });
+    const glow = new THREE.MeshBasicMaterial({ color: V.eye });
+    const skinMat = new THREE.MeshStandardMaterial({ color: V.hide, roughness: 0.9, emissive: 0xffffff, emissiveIntensity: 0, transparent: !!V.ghost, opacity: V.ghost ? 0.62 : 1 });
 
     // Legs: thigh angled forward, shin angled back (bent like an animal's hind leg)
     const feet = [];
@@ -213,13 +236,13 @@
       shin.rotation.x = -0.45;
       const foot = add(new THREE.Mesh(geo('swFoot', () => new THREE.BoxGeometry(0.11, 0.07, 0.3)), hide), sx * 0.16, 0.09, -0.04);
       for (const cx of [-0.035, 0.035]) {
-        const toe = new THREE.Mesh(geo('swToe', () => new THREE.ConeGeometry(0.02, 0.1, 5)), bone);
+        const toe = new THREE.Mesh(geo('swToe', () => new THREE.ConeGeometry(0.02, 0.1, 5)), V.id === 'crow' ? std(V.beak) : bone);
         toe.rotation.x = -Math.PI / 2; toe.position.set(cx, -0.01, -0.19); foot.add(toe);
       }
       feet.push(foot);
     }
 
-    // Hunched torso with a ridge of spine bumps
+    // Hunched torso with a ridge of spine bumps and ribs
     add(new THREE.Mesh(geo('swPelvis', () => new THREE.SphereGeometry(0.16, 10, 8)), hide), 0, 1.02, 0.02);
     const torso = add(new THREE.Mesh(geo('swTorso', () => new THREE.CylinderGeometry(0.21, 0.13, 0.72, 10)), skinMat), 0, 1.3, -0.1);
     torso.rotation.x = 0.5;
@@ -227,42 +250,79 @@
       const bump = add(new THREE.Mesh(geo('swSpine', () => new THREE.SphereGeometry(0.045, 6, 5)), bone), 0, 1.08 + i * 0.12, 0.1 - i * 0.07);
       bump.scale.set(1, 0.7, 1);
     }
-    for (let i = 0; i < 3; i++) {
+    if (V.id !== 'ram') for (let i = 0; i < 3; i++) {
       const rib = add(new THREE.Mesh(geo('swRib', () => new THREE.TorusGeometry(0.17, 0.012, 4, 14, Math.PI)), bone), 0, 1.22 + i * 0.1, -0.16 - i * 0.05);
       rib.rotation.set(0.5, 0, Math.PI);
     }
 
-    // Shaggy fur mantle over the shoulders with ragged strands
-    const mantle = add(new THREE.Mesh(geo('swMantle', () => new THREE.ConeGeometry(0.42, 0.42, 10, 1, true)), fur), 0, 1.5, -0.12);
-    mantle.material = std(0x2b2018, { roughness: 1, side: THREE.DoubleSide });
-    for (let i = 0; i < 10; i++) {
-      const a = (i / 10) * Math.PI * 2;
-      const strand = add(new THREE.Mesh(geo('swStrand', () => new THREE.ConeGeometry(0.06, 0.32, 4)), fur), Math.cos(a) * 0.38, 1.24, -0.12 + Math.sin(a) * 0.38);
-      strand.rotation.set(Math.sin(a) * 0.5 + Math.PI, 0, -Math.cos(a) * 0.5);
+    // Shoulder covering: fur, shaggy fur, feathers, wool, moss, or nothing
+    if (V.mantle !== 'none') {
+      const mantle = add(new THREE.Mesh(geo('swMantle', () => new THREE.ConeGeometry(0.42, 0.42, 10, 1, true)), fur), 0, 1.5, -0.12);
+      mantle.material = V.ghost ? fur : std(V.fur, { roughness: 1, side: THREE.DoubleSide });
+      const n = V.mantle === 'shaggy' ? 16 : V.mantle === 'feathers' ? 14 : 10;
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * Math.PI * 2;
+        let piece;
+        if (V.mantle === 'feathers') piece = new THREE.Mesh(geo('swFeather', () => new THREE.BoxGeometry(0.09, 0.36, 0.015)), fur);
+        else if (V.mantle === 'wool') piece = new THREE.Mesh(geo('swWool', () => new THREE.SphereGeometry(0.1, 7, 6)), fur);
+        else if (V.mantle === 'moss') piece = new THREE.Mesh(geo('swMoss', () => new THREE.SphereGeometry(0.08, 6, 5)), i % 3 ? fur : mat(0x6b8f3a));
+        else piece = new THREE.Mesh(geo('swStrand', () => new THREE.ConeGeometry(0.06, V.mantle === 'shaggy' ? 0.42 : 0.32, 4)), fur);
+        add(piece, Math.cos(a) * 0.38, V.mantle === 'wool' ? 1.36 : 1.24, -0.12 + Math.sin(a) * 0.38);
+        if (V.mantle === 'feathers') piece.rotation.set(Math.sin(a) * 0.6, -a, -Math.cos(a) * 0.6);
+        else if (V.mantle !== 'wool' && V.mantle !== 'moss') piece.rotation.set(Math.sin(a) * 0.5 + Math.PI, 0, -Math.cos(a) * 0.5);
+      }
     }
 
-    // Skull head: long muzzle, dark eye sockets, glowing eyes, small fangs, antlers
+    // Head: skull with sockets and glowing eyes, then the type's muzzle and headgear
     const head = new THREE.Group(); head.position.set(0, 1.42, -0.34); g.add(head);
     const skull = add(new THREE.Mesh(geo('swSkull', () => new THREE.SphereGeometry(0.19, 14, 10)), bone), 0, 0.02, 0, head);
     skull.scale.set(0.85, 0.9, 1.25);
-    add(new THREE.Mesh(geo('swSnout', () => new THREE.BoxGeometry(0.14, 0.11, 0.26)), bone), 0, -0.04, -0.24, head);
-    add(new THREE.Mesh(geo('swNose', () => new THREE.BoxGeometry(0.08, 0.05, 0.04)), dark), 0, -0.01, -0.38, head);
+    if (V.snout > 0) {
+      const sn = add(new THREE.Mesh(geo('swSnout', () => new THREE.BoxGeometry(0.14, 0.11, 1)), bone), 0, -0.04, -0.11 - V.snout / 2, head);
+      sn.scale.z = V.snout;
+      add(new THREE.Mesh(geo('swNose', () => new THREE.BoxGeometry(0.08, 0.05, 0.04)), dark), 0, -0.01, -0.12 - V.snout, head);
+    }
+    if (V.beak) {
+      const beak = add(new THREE.Mesh(geo('swBeak', () => new THREE.ConeGeometry(0.08, 0.38, 6)), std(V.beak, { roughness: 0.4 })), 0, -0.03, -0.38, head);
+      beak.rotation.x = -Math.PI / 2 - 0.25;
+    }
     for (const sx of [-1, 1]) {
       add(new THREE.Mesh(geo('swSocket', () => new THREE.SphereGeometry(0.05, 8, 6)), dark), sx * 0.075, 0.06, -0.17, head);
       add(new THREE.Mesh(geo('swEye', () => new THREE.SphereGeometry(0.026, 8, 6)), glow), sx * 0.075, 0.06, -0.205, head);
-      const fang = add(new THREE.Mesh(geo('swFang', () => new THREE.ConeGeometry(0.014, 0.06, 4)), bone), sx * 0.045, -0.12, -0.33, head);
-      fang.rotation.x = Math.PI;
-      // antler: main beam sweeping up and back, with two tines
-      const beam = add(new THREE.Mesh(geo('swAntler', () => new THREE.CylinderGeometry(0.018, 0.028, 0.42, 6)), bone), sx * 0.12, 0.26, 0.04, head);
-      beam.rotation.set(-0.35, 0, -sx * 0.55);
-      const tine1 = add(new THREE.Mesh(geo('swTine', () => new THREE.CylinderGeometry(0.012, 0.018, 0.18, 5)), bone), sx * 0.2, 0.33, -0.04, head);
-      tine1.rotation.set(0.5, 0, -sx * 0.1);
-      const tine2 = add(new THREE.Mesh(geo('swTine', () => new THREE.CylinderGeometry(0.012, 0.018, 0.18, 5)), bone), sx * 0.26, 0.45, 0.06, head);
-      tine2.rotation.set(-0.2, 0, -sx * 0.9);
+      if (V.snout > 0) {
+        const fang = add(new THREE.Mesh(geo('swFang', () => new THREE.ConeGeometry(0.014, 0.06, 4)), bone), sx * 0.045, -0.12, -0.08 - V.snout * 0.95, head);
+        fang.rotation.x = Math.PI;
+      }
+      if (V.head === 'antlers') {
+        const beam = add(new THREE.Mesh(geo('swAntler', () => new THREE.CylinderGeometry(0.018, 0.028, 0.42, 6)), bone), sx * 0.12, 0.26, 0.04, head);
+        beam.rotation.set(-0.35, 0, -sx * 0.55);
+        const tine1 = add(new THREE.Mesh(geo('swTine', () => new THREE.CylinderGeometry(0.012, 0.018, 0.18, 5)), bone), sx * 0.2, 0.33, -0.04, head);
+        tine1.rotation.set(0.5, 0, -sx * 0.1);
+        const tine2 = add(new THREE.Mesh(geo('swTine', () => new THREE.CylinderGeometry(0.012, 0.018, 0.18, 5)), bone), sx * 0.26, 0.45, 0.06, head);
+        tine2.rotation.set(-0.2, 0, -sx * 0.9);
+        if (V.id === 'bog') add(new THREE.Mesh(geo('swMossBlob', () => new THREE.SphereGeometry(0.05, 6, 5)), mat(0x6b8f3a)), sx * 0.22, 0.38, 0.0, head);
+      } else if (V.head === 'ears') {
+        const ear = add(new THREE.Mesh(geo('swEar', () => new THREE.ConeGeometry(0.06, 0.2, 4)), fur), sx * 0.1, 0.2, 0.06, head);
+        ear.rotation.z = -sx * 0.25;
+      } else if (V.head === 'crest') {
+        for (let i = 0; i < 4; i++) {
+          const f = add(new THREE.Mesh(geo('swCrest', () => new THREE.BoxGeometry(0.02, 0.24, 0.06)), fur), sx * 0.02, 0.2 + i * 0.02, 0.05 + i * 0.06, head);
+          f.rotation.x = -0.6 - i * 0.15;
+        }
+      } else if (V.head === 'spikes') {
+        for (let i = 0; i < 3; i++) {
+          const sp = add(new THREE.Mesh(geo('swSpike', () => new THREE.ConeGeometry(0.025, 0.2, 5)), bone), sx * (0.06 + i * 0.05), 0.2 - i * 0.03, 0.02 + i * 0.04, head);
+          sp.rotation.z = -sx * (0.3 + i * 0.25);
+        }
+      } else if (V.head === 'horns') {
+        const horn = add(new THREE.Mesh(geo('swHorn', () => new THREE.TorusGeometry(0.1, 0.035, 7, 14, Math.PI * 1.5)), bone), sx * 0.17, 0.08, 0.04, head);
+        horn.rotation.set(0, sx * Math.PI / 2, sx > 0 ? 0 : Math.PI);
+      }
     }
 
-    // Long arms hanging low, ending in clawed hands
+    // Long arms hanging low, ending in clawed hands (crows get talons)
     const hands = [];
+    const clawMat = V.id === 'crow' ? std(V.beak) : bone;
     for (const sx of [-1, 1]) {
       const upper = add(new THREE.Mesh(geo('swUpper', () => new THREE.CylinderGeometry(0.045, 0.035, 0.52, 7)), hide), sx * 0.3, 1.32, -0.2);
       upper.rotation.set(0.35, 0, sx * 0.12);
@@ -270,7 +330,7 @@
       fore.rotation.set(0.6, 0, 0);
       const hand = add(new THREE.Mesh(geo('swHand', () => new THREE.SphereGeometry(0.055, 8, 6)), hide), sx * 0.36, 0.72, -0.5);
       for (let c = -1; c <= 1; c++) {
-        const claw = new THREE.Mesh(geo('swClaw', () => new THREE.ConeGeometry(0.012, 0.13, 4)), bone);
+        const claw = new THREE.Mesh(geo('swClaw', () => new THREE.ConeGeometry(0.012, 0.13, 4)), clawMat);
         claw.position.set(c * 0.025, -0.06, -0.04); claw.rotation.x = Math.PI * 0.85; hand.add(claw);
       }
       hands.push(hand);
@@ -286,7 +346,7 @@
     const marker = new THREE.Mesh(geo('marker', () => new THREE.OctahedronGeometry(0.15)), new THREE.MeshBasicMaterial({ color: 0xff3b1f }));
     marker.position.y = 2.2; marker.scale.y = 1.4; g.add(marker);
 
-    const handles = { group: g, shirtMat: skinMat, feet, hands, marker, outline, teamBand, gun, tip: gun.userData.tip, outfit: null, skinwalker: true, head };
+    const handles = { group: g, shirtMat: skinMat, feet, hands, marker, outline, teamBand, gun, tip: gun.userData.tip, outfit: null, skinwalker: true, variant: V, head };
     handles.setWeapon = (id) => {
       const old = handles.gun, next = buildGun(id);
       next.position.copy(old.position); g.remove(old); g.add(next);
@@ -296,6 +356,8 @@
   }
 
   BA.buildSkinwalker = buildSkinwalker;
+  BA.SKINWALKERS = SKINWALKERS;
+  BA.SKINWALKER_ORDER = SKINWALKER_ORDER;
   BA.OUTFIT = OUTFIT;
   BA.DEFAULT_OUTFIT = DEFAULT_OUTFIT;
   BA.randomOutfit = randomOutfit;

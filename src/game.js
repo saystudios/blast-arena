@@ -134,7 +134,15 @@
       win() { [523, 659, 784, 1047].forEach((f, i) => tone('square', f, f, 0.22, 0.08, i * 0.12)); },
       lose() { [392, 330, 262].forEach((f, i) => tone('triangle', f, f * 0.98, 0.26, 0.1, i * 0.16)); },
       pop() { tone('sine', 600, 1400, 0.08, 0.12); noise(0.06, 0.15, 3000, 0, 2); },
-      growl(vol) { tone('sawtooth', 95, 55, 0.7, 0.07 * vol); tone('sawtooth', 101, 58, 0.7, 0.05 * vol); noise(0.6, 0.12 * vol, 220, 0, 2); tone('sine', 1400, 900, 0.25, 0.02 * vol, 0.45); },
+      // Each skinwalker type has its own call when it spots you
+      growl(vol, type) {
+        if (type === 'wolf') { tone('sine', 380, 620, 0.35, 0.06 * vol); tone('sine', 620, 520, 0.9, 0.06 * vol, 0.35); }
+        else if (type === 'crow') { [0, 0.22].forEach((d) => { noise(0.14, 0.2 * vol, 1500, d, 3); tone('sawtooth', 900, 650, 0.14, 0.04 * vol, d); }); }
+        else if (type === 'pale') { tone('sine', 1800, 1200, 1.1, 0.025 * vol); tone('sine', 1805, 1190, 1.1, 0.02 * vol); }
+        else if (type === 'ram') { tone('sawtooth', 220, 180, 0.5, 0.06 * vol); tone('square', 230, 170, 0.5, 0.03 * vol); }
+        else if (type === 'bog') { noise(0.8, 0.14 * vol, 160, 0, 1.5); tone('sine', 70, 45, 0.8, 0.08 * vol); }
+        else { tone('sawtooth', 95, 55, 0.7, 0.07 * vol); tone('sawtooth', 101, 58, 0.7, 0.05 * vol); noise(0.6, 0.12 * vol, 220, 0, 2); tone('sine', 1400, 900, 0.25, 0.02 * vol, 0.45); }
+      },
       click() { tone('sine', 900, 1100, 0.04, 0.05); }
     };
   })();
@@ -569,7 +577,9 @@
     if (!f.isPlayer) {
       // Offline bots are skinwalkers unless turned off in Settings; online players keep their own outfits.
       if (o.bot && store.settings.spookyBots && BA.buildSkinwalker) {
-        f.mesh = BA.buildSkinwalker({ weapon: f.weaponIds[0] });
+        f.mesh = BA.buildSkinwalker({ weapon: f.weaponIds[0], variant: o.variant });
+        f.play = f.mesh.variant.play;
+        f.name = `${f.mesh.variant.short} ${f.name}`;
         f.color = 0xe6dcc6;
       } else {
         f.mesh = BA.buildCharacter(o.outfit || BA.randomOutfit(), { weapon: f.weaponIds[0] });
@@ -738,9 +748,10 @@
     player = makeFighter({ id: 'you', name: 'You', isPlayer: true, team: teamOf ? teamOf.you : null, weaponIds: pIds, wIndex: pIndex });
     fighters.push(player);
     const names = BOT_NAMES.slice().sort(() => Math.random() - 0.5);
+    const kinds = (BA.SKINWALKER_ORDER || []).slice().sort(() => Math.random() - 0.5); // a mix of skinwalker types each match
     for (let i = 0; i < nBots; i++) {
       const weapon = C.WEAPON_ORDER[Math.floor(Math.random() * C.WEAPON_ORDER.length)];
-      fighters.push(makeFighter({ id: 'bot' + i, name: names[i % names.length], team: teamOf ? teamOf['bot' + i] : null, weaponIds: [weapon], bot: true }));
+      fighters.push(makeFighter({ id: 'bot' + i, name: names[i % names.length], team: teamOf ? teamOf['bot' + i] : null, weaponIds: [weapon], bot: true, variant: kinds.length ? kinds[i % kinds.length] : undefined }));
     }
     match = C.createMatch(modeId, ids, teamOf);
     fighters.forEach(respawn);
@@ -1572,13 +1583,13 @@
     if (seen) { ai.seenT += dt; ai.lastSeen.copy(t.pos); ai.hasLast = true; } else ai.seenT = 0;
     if (seen && !ai.wasSeen && t.isPlayer && b.mesh && b.mesh.skinwalker && state.time - (state.lastGrowl || -99) > 6) {
       state.lastGrowl = state.time;
-      Sfx.growl(clamp(1 - dist / 35, 0.15, 0.7));
+      Sfx.growl(clamp(1 - dist / 35, 0.15, 0.7), b.mesh.variant.id);
     }
     ai.wasSeen = seen;
 
     let mx = 0, mz = 0, wantYaw = b.yaw, wantPitch = 0;
     if (seen) {
-      const pref = w.botRange;
+      const pref = w.botRange * (b.play ? b.play.range : 1);
       const dxT = t.pos.x - b.pos.x, dzT = t.pos.z - b.pos.z;
       const l = Math.hypot(dxT, dzT) || 1, fx = dxT / l, fz = dzT / l;
       const fwd = dist > pref + 3 ? 1 : dist < pref - 3 ? -0.7 : 0;
@@ -1598,7 +1609,7 @@
       const ad = new V3().subVectors(aim, eye);
       wantYaw = Math.atan2(-ad.x, -ad.z);
       wantPitch = Math.atan2(ad.y, Math.hypot(ad.x, ad.z));
-      if (b.grounded && Math.random() < diff.jumpChance * dt && !unsafeAhead(b, mx, mz, 3)) b.vel.y = 7.6;
+      if (b.grounded && Math.random() < diff.jumpChance * (b.play ? b.play.jump : 1) * dt && !unsafeAhead(b, mx, mz, 3)) b.vel.y = 7.6;
       ai.path = null;
     } else {
       let goal;
@@ -1624,7 +1635,7 @@
     b.pitch += (wantPitch - b.pitch) * Math.min(1, dt * 8);
 
     if (b.slowT > 0) b.slowT -= dt;
-    const speed = 5.6 * (b.slowT > 0 ? b.slowMult || 0.5 : 1);
+    const speed = 5.6 * (b.slowT > 0 ? b.slowMult || 0.5 : 1) * (b.play ? b.play.speed : 1);
     if (b.grounded) {
       const k = Math.min(1, 10 * dt);
       b.vel.x += (mx * speed - b.vel.x) * k;
@@ -1675,7 +1686,7 @@
     const ai = b.ai;
     const dir = new V3().subVectors(aim, eye).normalize();
     const tSpeed = Math.hypot(t.vel.x, t.vel.z);
-    const err = diff.aimError * (1 + tSpeed / 12) * (w.id === 'precision' ? 0.7 : 1);
+    const err = diff.aimError * (1 + tSpeed / 12) * (w.id === 'precision' ? 0.7 : 1) * (b.play ? b.play.aim : 1);
     shoot(b, eye, C.spreadDir(dir, err), false, charge);
     if (w.mag) b.ammo[w.id]--;
     b.cool = (w.spinUp ? C.shotInterval(w, 0.5) : w.fireInterval) * diff.fireSlow;
