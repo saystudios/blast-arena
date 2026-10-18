@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Blast Arena</title>
+<title>Ben Zone</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -180,6 +180,8 @@ tr.me td { background: rgba(255, 122, 26, 0.18); }
 #dashPip.ready { opacity: 1; background: var(--zap); color: var(--ink); }
 #reloadTag { background: var(--gold); color: var(--ink); }
 #shieldTag { background: #9fe8ff; color: var(--ink); }
+#slowTag { background: #9be7ff; color: var(--ink); }
+#frost { position: absolute; inset: 0; opacity: 0; transition: opacity 0.2s; background: radial-gradient(ellipse at center, transparent 50%, rgba(155, 231, 255, 0.5) 100%); }
 #crosshair { --gap: 8px; position: absolute; left: 50%; top: 50%; width: 0; height: 0; }
 #crosshair i { position: absolute; background: #fff; box-shadow: 0 0 0 1.5px var(--ink); border-radius: 1px; }
 #crosshair i:nth-child(1), #crosshair i:nth-child(2) { width: 3px; height: 9px; left: -1.5px; }
@@ -313,8 +315,8 @@ details summary { cursor: pointer; color: var(--muted); font-size: 13px; min-hei
 </style>
 </head>
 <body>
-<canvas id="game" aria-label="Blast Arena game view"></canvas>
-<div id="loading">Loading Blast Arena…</div>
+<canvas id="game" aria-label="Ben Zone game view"></canvas>
+<div id="loading">Loading Ben Zone…</div>
 <div id="fatal" hidden><div><span>Uh-oh!</span><p id="fatalMsg"></p><button class="btn" onclick="location.reload()">Reload</button></div></div>
 
 <!-- HUD -->
@@ -328,14 +330,15 @@ details summary { cursor: pointer; color: var(--muted); font-size: 13px; min-hei
   <div id="chargeBar" hidden><div id="chargeFill"></div></div>
   <div id="hitmarker" class="hitmarker"></div>
   <div id="hurt"></div>
+  <div id="frost"></div>
   <div id="hurtDir"></div>
   <div id="fx"></div>
   <div id="banner" class="banner"></div>
   <div id="countdown" class="countdown"></div>
   <div class="hud-bottom">
     <div class="health">
-      <div class="tagline"><span class="mini" id="dashPip">DASH</span><span class="mini" id="reloadTag" hidden>RELOADING</span><span class="mini" id="shieldTag" hidden>SPAWN SHIELD</span></div>
-      <div class="health-bar"><div id="healthFill"></div><span id="healthNum">100</span></div>
+      <div class="tagline"><span class="mini" id="dashPip">DASH</span><span class="mini" id="reloadTag" hidden>RELOADING</span><span class="mini" id="shieldTag" hidden>SPAWN SHIELD</span><span class="mini" id="slowTag" hidden>FROZEN</span></div>
+      <div class="health-bar"><div id="healthFill"></div><span id="healthNum">150</span></div>
     </div>
     <div class="ammo"><div id="slots"></div><span id="weaponName">Laser Blaster</span><span><span id="ammoNum">16</span> <span id="ammoMag">/ 16</span></span></div>
   </div>
@@ -364,8 +367,8 @@ details summary { cursor: pointer; color: var(--muted); font-size: 13px; min-hei
 <div class="screen" id="menu" hidden>
   <div class="panel menu-grid">
     <div>
-      <h1 class="title">BLAST<br><span>ARENA</span></h1>
-      <p class="tag">8 blasters. 4 arenas. Team battles vs bots.</p>
+      <h1 class="title">BEN<br><span>ZONE</span></h1>
+      <p class="tag">14 blasters. 4 arenas. Team battles vs bots and online.</p>
     </div>
     <div class="card panel" style="max-width:none">
       <div><p class="label">Mode</p><div class="seg three" id="modePick"></div></div>
@@ -432,7 +435,7 @@ details summary { cursor: pointer; color: var(--muted); font-size: 13px; min-hei
   <div class="card panel" style="max-width:640px">
     <div class="net-head"><h2 class="label" style="font-size:14px;margin:0">Play online</h2><span class="net-status" id="netStatus">Offline</span></div>
     <div id="onlineHelp" hidden>
-      <p class="hint">Online play needs the Blast Arena server. It works when you open the game from your server's address or the iPhone/iPad app. This preview can't connect to outside servers, so play offline here, or enter a server address below and open the game from that address.</p>
+      <p class="hint">Online play needs the Ben Zone server. It works when you open the game from your server's address or the iPhone/iPad app. This preview can't connect to outside servers, so play offline here, or enter a server address below and open the game from that address.</p>
     </div>
     <div id="onlineBody" hidden style="display:grid;gap:12px">
       <div>

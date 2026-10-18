@@ -97,26 +97,30 @@ const server = http.createServer((req, res) => {
   const res = await page.evaluate(() => ({ phase: window.__blast.state.phase, title: document.getElementById('resultTitle').textContent }));
   check(res.phase === 'results' && res.title === 'Victory!', 'reaching the team score limit shows Victory');
 
-  // --- Practice: fire all 8 weapons at targets ---
+  // --- Practice: fire all 14 weapons at targets ---
   await page.evaluate(() => window.__blast.startMatch('practice'));
   await page.waitForTimeout(3300);
   const perWeapon = {};
-  for (let i = 0; i < 8; i++) {
-    await page.keyboard.press('Digit' + (i + 1));
+  const nWeapons = await page.evaluate(() => window.__blast.fighters[0].weaponIds.length);
+  for (let i = 0; i < nWeapons; i++) {
+    if (i < 10) await page.keyboard.press(i === 9 ? 'Digit0' : 'Digit' + (i + 1)); // number keys 1-9, 0
+    else await page.evaluate((i) => { const p = window.__blast.player; p.wIndex = i; p.swapT = 0.3; p.reloadT = 0; }, i);
     await page.waitForTimeout(400);
-    const before = await page.evaluate(() => ({ shots: window.__blast.state.matchShots, hits: window.__blast.state.matchHits }));
-    for (let k = 0; k < 4; k++) { // 8 weapons x 4 holds fits inside the 60 s practice round
+    const before = await page.evaluate(() => window.__blast.state.matchShots);
+    for (let k = 0; k < 2; k++) { // 14 weapons x 2 holds fits inside the 60 s practice round
       await page.mouse.move(640, 400);
       await page.mouse.down();
-      await page.waitForTimeout(950); // long enough to fully charge the bow
+      await page.waitForTimeout(1100); // long enough to fully charge the bow and rail
       await page.mouse.up();
       await page.waitForTimeout(150);
     }
-    const after = await page.evaluate(() => ({ shots: window.__blast.state.matchShots, hits: window.__blast.state.matchHits, w: window.__blast.fighters[0].weaponIds[window.__blast.fighters[0].wIndex] }));
-    perWeapon[after.w] = after.shots - before.shots;
+    const after = await page.evaluate(() => ({ shots: window.__blast.state.matchShots, w: window.__blast.fighters[0].weaponIds[window.__blast.fighters[0].wIndex] }));
+    perWeapon[after.w] = after.shots - before;
   }
   console.log('    shots per weapon:', JSON.stringify(perWeapon));
-  check(Object.keys(perWeapon).length === 8 && Object.values(perWeapon).every((n) => n >= 2), 'all 8 weapons fire');
+  check(Object.keys(perWeapon).length === 14 && Object.values(perWeapon).every((n) => n >= 2), 'all 14 weapons fire');
+  check(perWeapon.burst >= 6 && perWeapon.burst % 3 === 0, 'Burst Blaster fires in 3-shot bursts');
+  check(perWeapon.spin > 15, 'Spin Blaster spins up to a fast fire rate');
 
   // --- Duel on Neon City: aimed fire lands hits ---
   await page.evaluate(() => { const b = window.__blast; b.store.settings.map = 'neon'; b.startMatch('duel'); });

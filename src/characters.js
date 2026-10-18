@@ -1,5 +1,5 @@
 /*
- * Blast Arena — original cartoon character builder and outfit options.
+ * Ben Zone — original cartoon character builder and outfit options.
  * Used for bots, the player's own character in the Locker preview, and (Phase 3) other online players.
  */
 (function () {
@@ -56,7 +56,7 @@
   function buildGun(weaponId) {
     const w = BlastCore.WEAPONS[weaponId] || BlastCore.WEAPONS.laser;
     const g = new THREE.Group();
-    const long = weaponId === 'precision' || weaponId === 'rocket';
+    const long = weaponId === 'precision' || weaponId === 'rocket' || weaponId === 'rail' || weaponId === 'spin';
     const body = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.17, long ? 0.75 : 0.5), std(weaponId === 'rocket' ? 0x4b5d3a : 0x2a3346));
     body.position.z = long ? -0.12 : 0; g.add(body);
     const barrel = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.09, 0.22), std(w.color, { emissive: w.color, emissiveIntensity: 0.35 }));

@@ -49,7 +49,7 @@ class Match {
         id: info.id, name: info.name, outfit: info.outfit, team: teamOf ? teamOf[info.id] : null, loadout,
         pos: { x: 0, y: 0, z: 0 }, yaw: 0, pitch: 0, crouch: false, charging: false,
         hp: C.MAX_HEALTH, alive: true, respawnT: 0, shieldT: 0, lastHurt: -99, lastAttacker: null,
-        w: 0, ammo: {}, reloadT: 0, lastFire: -99, swapAt: -99,
+        w: 0, ammo: {}, reloadT: 0, lastFire: -99, lastShotAt: -99, burstUsed: 0, swapAt: -99, slowT: 0,
         hist: [], lastInputAt: 0, ignoreUntil: 0, anchor: null, pushBudget: 0, strikes: [],
         connected: true, leftAt: null, rtt: 0.1, shots: 0, hits: 0
       };
@@ -90,6 +90,7 @@ class Match {
     if (!p.connected && t - p.leftAt > DISCONNECT_GRACE) { this.removePlayer(p.id); return; }
     p.pushBudget = Math.max(0, p.pushBudget - dt * 6);
     if (p.shieldT > 0) p.shieldT -= dt;
+    if (p.slowT > 0) p.slowT -= dt;
     if (p.reloadT > 0) {
       p.reloadT -= dt;
       if (p.reloadT <= 0) { const w = p.loadout[p.w]; p.ammo[w] = C.WEAPONS[w].mag; this.toPlayer(p.id, { k: 'ammo', w: p.w, n: p.ammo[w] }); }
@@ -218,16 +219,22 @@ class Match {
     const d = { x: d0.x / dl, y: d0.y / dl, z: d0.z / dl };
     const charge = w.chargeTime ? Math.max(0, Math.min(1, fin(msg.c) ? msg.c : 0)) : 1;
     const minGap = w.fireInterval * 0.8 + (w.chargeTime ? charge * w.chargeTime * 0.7 : 0) - 0.02;
-    if (t - p.lastFire < minGap) return this.reject(p, 'rate');
+    let burstShot = false;
+    if (t - p.lastFire < minGap) {
+      // Burst weapons: the follow-up shots of one trigger pull arrive inside the normal gap.
+      if (w.burst && p.burstUsed < w.burst - 1 && t - p.lastShotAt >= w.burstGap * 0.6) burstShot = true;
+      else return this.reject(p, 'rate');
+    }
     if (t - p.swapAt < 0.15) return this.reject(p, 'swap');
     if (p.reloadT > 0) return this.reject(p, 'reload');
     if (w.mag && p.ammo[w.id] <= 0) { p.reloadT = w.reload; return this.reject(p, 'empty'); }
     const eye = { x: p.pos.x, y: p.pos.y + (p.crouch ? 0.88 : 1.55), z: p.pos.z };
     if (Math.hypot(o.x - eye.x, o.y - eye.y, o.z - eye.z) > 1.8) return this.reject(p, 'origin');
-    p.lastFire = t; p.shots++;
+    if (burstShot) p.burstUsed++; else { p.lastFire = t; p.burstUsed = 0; }
+    p.lastShotAt = t; p.shots++;
     if (w.mag) { p.ammo[w.id]--; if (p.ammo[w.id] <= 0) p.reloadT = w.reload; }
     const seed = Number.isInteger(msg.s) ? msg.s >>> 0 : 1;
-    if (w.type === 'hitscan') this.fireHitscan(p, w, o, d, !!msg.a, seed, t);
+    if (w.type === 'hitscan') this.fireHitscan(p, w, o, d, !!msg.a, seed, t, charge);
     else this.fireProjectile(p, w, o, d, !!msg.a, seed, charge);
   }
 
@@ -275,24 +282,51 @@ class Match {
     return { t: best, player: hitP, head, box: hitBox };
   }
 
-  fireHitscan(p, w, o, d, ads, seed, t) {
+  /** All enemies a piercing ray passes through (rewound), plus where it hits a wall. */
+  castRayPierce(o, d, max, shooter, rewindT) {
+    let wallT = max;
+    for (const b of this.geo.boxes) { const tt = C.rayAABB(o, d, b); if (tt < wallT) wallT = tt; }
+    const hits = [];
+    for (const q of this.players.values()) {
+      if (q === shooter || !q.alive || !q.connected || !this.isEnemy(shooter, q)) continue;
+      const at = this.posAt(q, rewindT);
+      const h = at.crouch ? 1.05 : 1.7;
+      const th = C.raySphere(o, d, C.playerHead(at.pos, h), 0.4), tb = C.rayAABB(o, d, C.playerBody(at.pos, h));
+      const tt = Math.min(th, tb);
+      if (tt < wallT) hits.push({ player: q, t: tt, head: th <= tb });
+    }
+    return { wallT, hits };
+  }
+
+  fireHitscan(p, w, o, d, ads, seed, t, charge) {
     const rewindT = t - Math.min(REWIND_MAX, p.rtt / 2 + INTERP_DELAY);
     const dirs = C.pelletDirs(w, d, ads, seed);
     const victims = new Map();
     const ends = [];
+    const dmgAt = (dist) => (w.chargeTime ? C.chargedDamage(w, charge) : C.damageAt(w, dist));
     for (const dir of dirs) {
+      if (w.pierce) {
+        const ph = this.castRayPierce(o, dir, w.range, p, rewindT);
+        ends.push([r2(o.x + dir.x * ph.wallT), r2(o.y + dir.y * ph.wallT), r2(o.z + dir.z * ph.wallT)]);
+        for (const h of ph.hits) {
+          const v = victims.get(h.player) || { dmg: 0, head: false };
+          v.dmg += dmgAt(h.t) * (h.head ? (w.headMult || C.HEAD_MULTIPLIER) : 1); v.head = v.head || h.head;
+          victims.set(h.player, v);
+        }
+        continue;
+      }
       const hit = this.castRay(o, dir, w.range, p, rewindT);
       ends.push([r2(o.x + dir.x * hit.t), r2(o.y + dir.y * hit.t), r2(o.z + dir.z * hit.t)]);
       if (hit.player) {
         const v = victims.get(hit.player) || { dmg: 0, head: false };
-        v.dmg += C.damageAt(w, hit.t) * (hit.head ? (w.headMult || C.HEAD_MULTIPLIER) : 1);
+        v.dmg += dmgAt(hit.t) * (hit.head ? (w.headMult || C.HEAD_MULTIPLIER) : 1);
         v.head = v.head || hit.head;
         victims.set(hit.player, v);
       }
     }
     this.broadcast({ k: 'shot', id: p.id, w: w.id, o: [r2(o.x), r2(o.y), r2(o.z)], e: ends }, p.id);
     if (victims.size) p.hits++;
-    victims.forEach((v, q) => this.damage(q, v.dmg, p, v.head));
+    victims.forEach((v, q) => this.damage(q, v.dmg, p, v.head, w));
   }
 
   fireProjectile(p, w, o, d, ads, seed, charge) {
@@ -302,7 +336,7 @@ class Match {
     const dir = C.spreadDir(d, spread, rng);
     const color = w.id === 'paintball' ? (p.team === 'orange' ? 0xff7a1a : p.team === 'blue' ? 0x2f7bff : [0x9dff2e, 0x22d3ff, 0xff7a1a, 0xffd60a][seed % 4]) : w.color;
     const pr = {
-      pid: this.nextPid++, owner: p, w, dmg, color, life: w.range / speed + 0.5,
+      pid: this.nextPid++, owner: p, w, dmg, color, life: C.projectileLife(w, speed), bounces: w.bounces || 0,
       pos: { x: o.x + dir.x * 0.6, y: o.y + dir.y * 0.6, z: o.z + dir.z * 0.6 },
       vel: { x: dir.x * speed, y: dir.y * speed, z: dir.z * speed }
     };
@@ -322,11 +356,19 @@ class Match {
       const hit = this.castRay(pr.pos, d, len, pr.owner, null);
       if (hit.t < len) {
         const at = { x: pr.pos.x + d.x * hit.t, y: pr.pos.y + d.y * hit.t, z: pr.pos.z + d.z * hit.t };
+        if (hit.box && pr.bounces > 0) {
+          const n = C.boxNormal(at, hit.box);
+          pr.vel = C.reflect(pr.vel, n, pr.w.bounceDamp || 0.6);
+          pr.pos = { x: at.x + n.x * 0.06, y: at.y + n.y * 0.06, z: at.z + n.z * 0.06 };
+          pr.bounces--;
+          keep.push(pr);
+          continue;
+        }
         if (pr.w.splash) {
           const n = hit.box ? C.boxNormal(at, hit.box) : { x: -d.x, y: -d.y, z: -d.z };
           this.explode(pr, { x: at.x + n.x * 0.05, y: at.y + n.y * 0.05, z: at.z + n.z * 0.05 }, hit.player, n);
         } else {
-          if (hit.player) { pr.owner.hits++; this.damage(hit.player, pr.dmg * (hit.head ? (pr.w.headMult || C.HEAD_MULTIPLIER) : 1), pr.owner, hit.head); }
+          if (hit.player) { pr.owner.hits++; this.damage(hit.player, pr.dmg * (hit.head ? (pr.w.headMult || C.HEAD_MULTIPLIER) : 1), pr.owner, hit.head, pr.w); }
           this.broadcast({ k: 'impact', pid: pr.pid, id: pr.owner.id, p: [r2(at.x), r2(at.y), r2(at.z)] });
         }
         continue;
@@ -374,10 +416,11 @@ class Match {
     if (any) owner.hits++;
   }
 
-  damage(victim, amount, attacker, head) {
+  damage(victim, amount, attacker, head, w) {
     if (!victim.alive || this.state !== 'play') return;
     const self = victim === attacker;
     if (victim.shieldT > 0) amount = 0;
+    if (w && w.slow && amount > 0 && !self) { victim.slowT = w.slowTime; this.toPlayer(victim.id, { k: 'slow', secs: w.slowTime, m: w.slow }); }
     if (!self) this.toPlayer(attacker.id, { k: 'hit', v: victim.id, a: Math.round(amount), h: head ? 1 : 0, at: [r2(victim.pos.x), r2(victim.pos.y + 1.2), r2(victim.pos.z)] });
     if (amount <= 0) return;
     victim.hp -= amount;
@@ -408,10 +451,11 @@ class Match {
   flush(t) {
     const s = [];
     for (const p of this.players.values()) {
-      const flags = (p.alive ? 1 : 0) | (p.crouch ? 2 : 0) | (p.shieldT > 0 ? 4 : 0) | (p.charging ? 8 : 0) | (p.connected ? 0 : 16);
+      const flags = (p.alive ? 1 : 0) | (p.crouch ? 2 : 0) | (p.shieldT > 0 ? 4 : 0) | (p.charging ? 8 : 0) | (p.connected ? 0 : 16) | (p.slowT > 0 ? 32 : 0);
       s.push([p.id, r2(p.pos.x), r2(p.pos.y), r2(p.pos.z), r2(p.yaw), r2(p.pitch), Math.ceil(p.hp), flags, p.w]);
     }
-    const base = { t: 'snap', ts: Math.round(t * 1000), st: this.state, tl: Math.round(C.timeLeft(this.match) * 10) / 10, s, ...this.scoreState() };
+    // `now` is the server clock in ms (used by clients to smooth movement); `ts` is team scores.
+    const base = Object.assign({ t: 'snap', st: this.state, tl: Math.round(C.timeLeft(this.match) * 10) / 10, s }, this.scoreState(), { now: Math.round(t * 1000) });
     for (const p of this.players.values()) {
       if (!p.connected) continue;
       const evs = this.events.filter((e) => e.except !== p.id).map((e) => e.ev);

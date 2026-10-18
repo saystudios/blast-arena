@@ -1,5 +1,5 @@
 /*
- * Blast Arena — maps. Each map is data plus a build(ctx) function that places boxes.
+ * Ben Zone — maps. Each map is data plus a build(ctx) function that places boxes.
  * Collision is boxes only (fast, predictable, server-friendly). Decorations have no collision.
  * To add a map: add an entry to BA.MAPS with the same shape, and put its id in BA.MAP_ORDER.
  * Spawns: { x, z, team } where team is 'blue', 'orange' or omitted (free-for-all only).

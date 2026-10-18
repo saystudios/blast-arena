@@ -1,4 +1,4 @@
-# Blast Arena game server (also serves the game). No npm install needed.
+# Ben Zone game server (also serves the game). No npm install needed.
 FROM node:22-alpine
 WORKDIR /app
 COPY index.html ./

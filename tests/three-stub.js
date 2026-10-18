@@ -34,7 +34,7 @@
   class Light extends Object3D { constructor(c, g, i) { super(); this.color = new Color(c); this.groundColor = new Color(g); this.intensity = i; this.shadow = { mapSize: { set() {} }, camera: {}, bias: 0 }; } }
   class Geometry { translate() { return this; } dispose() {} }
   class Color { constructor(v) { this.v = v; } setHex(v) { this.v = v; return this; } }
-  class Material { constructor(o) { Object.assign(this, o); this.color = new Color(o && o.color); } }
+  class Material { constructor(o) { Object.assign(this, o); this.color = new Color(o && o.color); this.emissive = new Color(o && o.emissive); } }
   const THREE = {
     Vector3, Quaternion, Object3D, Mesh, Group: Object3D, Scene: Object3D, LineSegments: Mesh,
     PerspectiveCamera: class extends Object3D { constructor(fov, aspect) { super(); this.fov = fov; this.aspect = aspect; } setViewOffset() {} clearViewOffset() {} },

@@ -1,5 +1,5 @@
 /*
- * Blast Arena game server. No dependencies: `node server/index.js`.
+ * Ben Zone game server. No dependencies: `node server/index.js`.
  * Serves the game files and the multiplayer WebSocket at /ws on the same port.
  *
  * Environment:
@@ -66,7 +66,7 @@ function createServer(opts) {
 if (require.main === module) {
   const port = Number(process.env.PORT) || 8080;
   const app = createServer();
-  app.listen(port).then((p) => console.log(`Blast Arena server on http://localhost:${p}  (WebSocket /ws)`));
+  app.listen(port).then((p) => console.log(`Ben Zone server on http://localhost:${p}  (WebSocket /ws)`));
   const stop = () => { app.lobby.save(); setTimeout(() => process.exit(0), 1800); };
   process.on('SIGTERM', stop); process.on('SIGINT', stop);
 }

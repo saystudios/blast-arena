@@ -25,7 +25,7 @@ function bot(port) {
 }
 
 (async () => {
-  console.log('Blast Arena online end-to-end');
+  console.log('Ben Zone online end-to-end');
   const app = createServer({ dataDir: null, countdown: 0.6, rematchWindow: 4 });
   const port = await app.listen(0);
   const L = app.lobby;

@@ -47,13 +47,13 @@ async function login(port, extra) {
 const dirTo = (a, b) => { const d = { x: b.x - a.x, y: b.y - a.y, z: b.z - a.z }; const l = Math.hypot(d.x, d.y, d.z); return [d.x / l, d.y / l, d.z / l]; };
 
 (async () => {
-  console.log('Blast Arena server tests');
+  console.log('Ben Zone server tests');
   const app = createServer({ dataDir: null, countdown: 0.2, queueWait: 1, rematchWindow: 1.5 });
   const port = await app.listen(0);
   const L = app.lobby;
 
   await test('serves the game but not server files or data', async () => {
-    const ok = await fetch(`http://localhost:${port}/`); assert.strictEqual(ok.status, 200); assert.ok((await ok.text()).includes('Blast Arena'));
+    const ok = await fetch(`http://localhost:${port}/`); assert.strictEqual(ok.status, 200); assert.ok((await ok.text()).includes('Ben Zone'));
     assert.strictEqual((await fetch(`http://localhost:${port}/src/core.js`)).status, 200);
     assert.strictEqual((await fetch(`http://localhost:${port}/server/lobby.js`)).status, 404);
     assert.strictEqual((await fetch(`http://localhost:${port}/data/db.json`)).status, 404);
@@ -115,6 +115,8 @@ const dirTo = (a, b) => { const d = { x: b.x - a.x, y: b.y - a.y, z: b.z - a.z }
     assert.ok(snaps.length >= 9 && snaps.length <= 15, 'snapshots: ' + snaps.length);
     assert.strictEqual(snaps[snaps.length - 1].s.length, 2);
     assert.strictEqual(snaps[snaps.length - 1].st, 'play');
+    assert.strictEqual(typeof snaps[snaps.length - 1].now, 'number', 'snapshot carries the server clock');
+    assert.ok(snaps[snaps.length - 1].now > snaps[0].now);
   });
 
   await test('movement: normal steps accepted, teleport snapped back', async () => {
@@ -145,14 +147,14 @@ const dirTo = (a, b) => { const d = { x: b.x - a.x, y: b.y - a.y, z: b.z - a.z }
     place(A.me.id, 0, 0, 22); place(B.me.id, 0, 0, 16);
     const eye = { x: 0, y: 1.55, z: 22 }, chest = { x: 0, y: 1.0, z: 16 };
     const ma = A.mark(), mb = B.mark();
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 8; i++) { // 150 health = 8 laser hits (fewer with a headshot)
       A.send({ t: 'fire', w: 0, o: [eye.x, eye.y, eye.z], d: dirTo(eye, chest), s: 100 + i, a: 1 });
       await sleep(170);
     }
     const elim = await B.wait((m) => m.t === 'ev' && m.k === 'elim' && m.v === B.me.id, mb);
     assert.strictEqual(elim.by, A.me.id);
-    assert.ok(A.count((m) => m.t === 'ev' && m.k === 'hit', ma) >= 4); // a headshot can finish in 4
-    assert.ok(B.count((m) => m.t === 'ev' && m.k === 'dmg' && m.v === B.me.id, mb) >= 4);
+    assert.ok(A.count((m) => m.t === 'ev' && m.k === 'hit', ma) >= 5); // headshots can finish sooner
+    assert.ok(B.count((m) => m.t === 'ev' && m.k === 'dmg' && m.v === B.me.id, mb) >= 5);
     assert.strictEqual(match().match.scores[A.me.id].kills, 1);
   });
 
@@ -348,6 +350,79 @@ const dirTo = (a, b) => { const d = { x: b.x - a.x, y: b.y - a.y, z: b.z - a.z }
     assert.strictEqual(Y.count((m) => m.t === 'chat'), 1);
     X.close(); Y.close();
   });
+
+  // ---------------- Weapon pack 2 ----------------
+  {
+    const S = await login(port, { loadout: ['burst', 'rail'] });
+    const T = await login(port, { loadout: ['frost', 'bounce'] });
+    const U = await login(port, { loadout: ['spin', 'bubble'] });
+    S.send({ t: 'room_create', mode: 'ffa', map: 'yard' });
+    const r = (await S.wait((m) => m.t === 'room' && m.room)).room;
+    T.send({ t: 'room_join', code: r.code }); U.send({ t: 'room_join', code: r.code });
+    await S.wait((m) => m.t === 'room' && m.room && m.room.players.length === 3);
+    S.send({ t: 'room_start' });
+    await S.wait((m) => m.t === 'match_start');
+    await sleep(500);
+    const mm = () => L.roomOf(S.me.id).match;
+    const put = (id, x, z) => { const q = mm().players.get(id); q.pos = { x, y: 0, z }; q.hist = []; q.anchor = { ...q.pos }; q.ignoreUntil = 0; q.shieldT = 0; q.hp = C.MAX_HEALTH; q.alive = true; return q; };
+    const reset = () => { put(S.me.id, 0, 24); put(T.me.id, 0, 20); put(U.me.id, 0, 16); };
+    const eyeS = { x: 0, y: 1.55, z: 24 };
+
+    await test('burst: 3 shots per trigger accepted, a 4th right after is rejected', async () => {
+      reset(); await sleep(200);
+      const mk = S.mark();
+      for (let i = 0; i < 4; i++) { S.send({ t: 'fire', w: 0, o: [0, 1.55, 24], d: dirTo(eyeS, { x: 0, y: 1.0, z: 20 }), s: 50 + i, a: 1 }); await sleep(75); }
+      await sleep(300);
+      assert.strictEqual(S.count((m) => m.t === 'ev' && m.k === 'hit', mk), 3);
+      assert.ok(S.count((m) => m.t === 'ev' && m.k === 'ammo' && m.why === 'rate', mk) >= 1);
+    });
+
+    await test('rail: a full charge pierces through two enemies in a line', async () => {
+      await sleep(1600); reset();
+      S.send({ t: 'input', p: [0, 0, 24], yaw: 0, pitch: 0, w: 1 });
+      await sleep(250);
+      const mt = T.mark(), mu = U.mark();
+      S.send({ t: 'fire', w: 1, o: [0, 1.55, 24], d: [0, -0.03, -1], s: 8, c: 1, a: 1 });
+      await T.wait((m) => m.t === 'ev' && m.k === 'dmg' && m.v === T.me.id, mt);
+      await U.wait((m) => m.t === 'ev' && m.k === 'dmg' && m.v === U.me.id, mu);
+    });
+
+    await test('frost: hits slow the target (event + snapshot flag)', async () => {
+      await sleep(2600); reset();
+      put(T.me.id, 0, 12); put(S.me.id, 0, 18); put(U.me.id, 20, 0);
+      await sleep(200);
+      const ms = S.mark();
+      T.send({ t: 'fire', w: 0, o: [0, 1.55, 12], d: dirTo({ x: 0, y: 1.55, z: 12 }, { x: 0, y: 1.0, z: 18 }), s: 3, a: 1 });
+      const sl = await S.wait((m) => m.t === 'ev' && m.k === 'slow', ms);
+      assert.ok(sl.secs > 1 && sl.m < 1);
+      const snap = await S.wait((m) => m.t === 'snap' && m.s.some((row) => row[0] === S.me.id && (row[7] & 32)), ms);
+      assert.ok(snap);
+    });
+
+    await test('bounce bomb: server bounces it and it explodes with splash', async () => {
+      await sleep(400);
+      put(T.me.id, -6, 12); put(S.me.id, -6, 8.5); put(U.me.id, 20, 0); // open floor, clear of the tower stairs
+      T.send({ t: 'input', p: [-6, 0, 12], yaw: 0, pitch: 0, w: 1 });
+      await sleep(250);
+      const ms = S.mark();
+      // aimed at the floor in front of S so it bounces first
+      T.send({ t: 'fire', w: 1, o: [-6, 1.55, 12], d: dirTo({ x: -6, y: 1.55, z: 12 }, { x: -6, y: 0, z: 10 }), s: 4, a: 1 });
+      const boom = await S.wait((m) => m.t === 'ev' && m.k === 'boom' && m.w === 'bounce', ms, 4000);
+      assert.ok(boom);
+      await S.wait((m) => m.t === 'ev' && m.k === 'dmg' && m.v === S.me.id, ms);
+    });
+
+    await test('spin and bubble fire within their limits', async () => {
+      await sleep(300); reset();
+      put(U.me.id, 0, 22); put(S.me.id, 0, 18);
+      await sleep(200);
+      const mu = U.mark();
+      for (let i = 0; i < 8; i++) { U.send({ t: 'fire', w: 0, o: [0, 1.55, 22], d: dirTo({ x: 0, y: 1.55, z: 22 }, { x: 0, y: 1, z: 18 }), s: i, a: 0 }); await sleep(60); }
+      await sleep(200);
+      assert.ok(U.count((m) => m.t === 'ev' && m.k === 'hit', mu) >= 5, 'spin hits');
+    });
+    S.close(); T.close(); U.close();
+  }
 
   A.close(); B.close();
   await sleep(100);

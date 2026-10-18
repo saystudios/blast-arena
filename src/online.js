@@ -1,5 +1,5 @@
 /*
- * Blast Arena — online layer (Phase 3).
+ * Ben Zone — online layer (Phase 3).
  * Owns the WebSocket connection, sign-in token, and the Online / Room screens:
  * quick match, private rooms with codes, friends & invites, leaderboard, match history,
  * quick chat, report & block, rematch voting and automatic reconnection.

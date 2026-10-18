@@ -1,5 +1,5 @@
 /*
- * Blast Arena — core game rules (engine-agnostic, no Three.js dependency).
+ * Ben Zone — core game rules (engine-agnostic, no Three.js dependency).
  * Shared by the browser client and (in Phase 3) the authoritative server,
  * so hit detection, damage and match scoring are computed by the same code on both sides.
  * Works as a browser global (window.BlastCore) and as a Node module.
@@ -65,12 +65,51 @@
       fireInterval: 0.25, chargeTime: 0.8, mag: 0, reload: 0, range: 140,
       speed: 85, speedMin: 35, gravity: 9,
       recoil: 0.02, color: 0x7c5cff, botRange: 22
+    },
+    // ---- Pack 2 ----
+    burst: {
+      id: 'burst', name: 'Burst Blaster', role: '3-shot bursts, mid range', type: 'hitscan',
+      damage: 16, pellets: 1, burst: 3, burstGap: 0.07, spread: 0.012, adsSpread: 0.004,
+      fireInterval: 0.42, mag: 18, reload: 1.6, range: 80, falloffStart: 30, minFalloff: 0.55,
+      recoil: 0.012, color: 0x14e8c4, botRange: 15
+    },
+    frost: {
+      id: 'frost', name: 'Frost Beam', role: 'Slows enemies down', type: 'hitscan',
+      damage: 12, pellets: 1, spread: 0.02, adsSpread: 0.01,
+      fireInterval: 0.12, mag: 30, reload: 1.8, range: 40, falloffStart: 20, minFalloff: 0.6,
+      slow: 0.5, slowTime: 1.4, recoil: 0.006, color: 0x9be7ff, botRange: 12
+    },
+    bounce: {
+      id: 'bounce', name: 'Bounce Bomb', role: 'Bouncing bombs with a fuse', type: 'projectile',
+      damage: 70, pellets: 1, spread: 0.01, adsSpread: 0.005,
+      fireInterval: 0.75, mag: 4, reload: 2.2, range: 60, speed: 24, gravity: 16, life: 1.6,
+      bounces: 3, bounceDamp: 0.55, splash: 3.2, splashMin: 15, knockback: 9, selfScale: 0.3,
+      recoil: 0.035, color: 0xb4ff00, botRange: 12
+    },
+    bubble: {
+      id: 'bubble', name: 'Bubble Blaster', role: 'Close-range bubble stream', type: 'projectile',
+      damage: 7, pellets: 1, spread: 0.06, adsSpread: 0.04,
+      fireInterval: 0.06, mag: 50, reload: 2.0, range: 16, speed: 22, gravity: -1.5, life: 0.75,
+      recoil: 0.004, color: 0x5ab4ff, botRange: 6
+    },
+    spin: {
+      id: 'spin', name: 'Spin Blaster', role: 'Spins up into a bullet storm', type: 'hitscan',
+      damage: 8, pellets: 1, spread: 0.04, adsSpread: 0.025,
+      fireInterval: 0.05, spinUp: 1.0, spinStartInterval: 0.2, moveSlow: 0.75,
+      mag: 80, reload: 2.6, range: 55, falloffStart: 18, minFalloff: 0.5,
+      recoil: 0.005, color: 0xa7b4c8, botRange: 14
+    },
+    rail: {
+      id: 'rail', name: 'Rail Charger', role: 'Charge to pierce through enemies', type: 'hitscan',
+      damage: 90, damageMin: 25, pellets: 1, chargeTime: 1.0, pierce: true, spread: 0.02, adsSpread: 0, headMult: 1.5,
+      fireInterval: 0.4, mag: 6, reload: 2.4, range: 120, falloffStart: 120, minFalloff: 1,
+      recoil: 0.06, color: 0xe040fb, botRange: 24
     }
   };
-  const WEAPON_ORDER = ['laser', 'scatter', 'dart', 'paintball', 'precision', 'rapid', 'rocket', 'bow'];
+  const WEAPON_ORDER = ['laser', 'scatter', 'dart', 'paintball', 'precision', 'rapid', 'rocket', 'bow', 'burst', 'frost', 'bounce', 'bubble', 'spin', 'rail'];
 
   const HEAD_MULTIPLIER = 1.5;
-  const MAX_HEALTH = 100;
+  const MAX_HEALTH = 150; // everyone (players and bots) starts with 150
   const STEP_HEIGHT = 0.4;
   const EPS = 1e-4;
   const TEAMS = ['blue', 'orange'];
@@ -112,6 +151,25 @@
     if (!weapon.splash || dist > weapon.splash) return 0;
     return weapon.splashMin + (weapon.damage - weapon.splashMin) * (1 - dist / weapon.splash);
   }
+
+  /** Damage for charged weapons (bow, rail) at a charge from 0 to 1. */
+  function chargedDamage(weapon, charge) {
+    const c = clamp01(charge);
+    return weapon.damageMin + (weapon.damage - weapon.damageMin) * c;
+  }
+  /** Seconds between shots right now (Spin Blaster speeds up while held: spin 0..1). */
+  function shotInterval(weapon, spin) {
+    if (!weapon.spinUp) return weapon.fireInterval;
+    const s = clamp01(spin || 0);
+    return weapon.spinStartInterval + (weapon.fireInterval - weapon.spinStartInterval) * s;
+  }
+  /** Bounces a velocity off a surface with normal n, keeping `damp` of the speed. */
+  function reflect(v, n, damp) {
+    const d = v.x * n.x + v.y * n.y + v.z * n.z;
+    return { x: (v.x - 2 * d * n.x) * damp, y: (v.y - 2 * d * n.y) * damp, z: (v.z - 2 * d * n.z) * damp };
+  }
+  /** Projectile lifetime in seconds. */
+  function projectileLife(weapon, speed) { return weapon.life || weapon.range / (speed || weapon.speed) + 0.5; }
 
   /** Energy bow: speed, damage and spread for a charge from 0 to 1. */
   function bowShot(weapon, charge) {
@@ -465,6 +523,7 @@
 
   return {
     WEAPONS, WEAPON_ORDER, MODES, DIFFICULTY, TEAMS, HEAD_MULTIPLIER, MAX_HEALTH, STEP_HEIGHT,
+    chargedDamage, shotInterval, reflect, projectileLife,
     makeRng, pelletDirs, playerHead, playerBody, PROTOCOL: 1,
     damageAt, splashDamage, bowShot, rayAABB, raySphere, boxNormal, spreadDir, normalize,
     overlaps, anyOverlap, moveEntity, groundAt, buildNavGraph, nearestNode, findPath, pickSpawn,
