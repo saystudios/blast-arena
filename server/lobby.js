@@ -487,7 +487,7 @@ class Lobby {
     this.db.reports.push({ at: Date.now(), from: id, about: otherId, aboutName: other.name, reason, room: room ? room.code : null });
     if (this.db.reports.length > 5000) this.db.reports.splice(0, this.db.reports.length - 5000);
     this.save();
-    this.sendTo(id, { t: 'notice', msg: 'Thanks. Your report was sent to the Blast Arena team.' });
+    this.sendTo(id, { t: 'notice', msg: 'Thanks. Your report was sent to the Ben Zone team.' });
   }
   chat(id, i) {
     if (!Number.isInteger(i) || i < 0 || i >= QUICK_CHAT.length) return;

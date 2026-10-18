@@ -11,7 +11,7 @@ const box = (x0, y0, z0, x1, y1, z1) => ({ min: { x: x0, y: y0, z: z0 }, max: { 
 const floor = box(-50, -1, -50, 50, 0, 50);
 const entity = (x, y, z) => ({ pos: { x, y, z }, vel: { x: 0, y: 0, z: 0 }, radius: 0.42, height: 1.7, grounded: false });
 
-console.log('Blast Arena core tests');
+console.log('Ben Zone core tests');
 
 test('damage is full inside falloff start and reduced at max range', () => {
   const w = C.WEAPONS.laser;
@@ -20,12 +20,13 @@ test('damage is full inside falloff start and reduced at max range', () => {
   assert.strictEqual(C.damageAt(w, w.range + 1), 0);
 });
 
-test('weapons are balanced: time-to-eliminate between 0.5s and 1.5s at ideal range', () => {
+test('weapons are balanced: time-to-eliminate between 0.6s and 2.3s at ideal range (150 health)', () => {
   for (const w of Object.values(C.WEAPONS)) {
     const perShot = w.damage * w.pellets;
     const shots = Math.ceil(C.MAX_HEALTH / perShot);
-    const ttk = (shots - 1) * (w.fireInterval + (w.chargeTime || 0));
-    assert.ok(ttk >= 0.5 && ttk <= 1.5, `${w.id} ttk ${ttk}`);
+    const b = w.burst || 1;
+    const ttk = (Math.ceil(shots / b) - 1) * (w.fireInterval + (w.chargeTime || 0)) + ((shots - 1) % b) * (w.burstGap || 0);
+    assert.ok(ttk >= 0.6 && ttk <= 2.3, `${w.id} ttk ${ttk}`);
   }
 });
 
@@ -107,9 +108,10 @@ test('self-elimination does not award a point', () => {
 });
 
 test('every weapon in WEAPON_ORDER is defined with a distinct color', () => {
-  assert.strictEqual(C.WEAPON_ORDER.length, 8);
+  assert.strictEqual(C.WEAPON_ORDER.length, 14);
+  assert.ok(C.WEAPON_ORDER.every((id) => C.WEAPONS[id] && C.WEAPONS[id].id === id));
   const colors = new Set(C.WEAPON_ORDER.map((id) => C.WEAPONS[id].color));
-  assert.strictEqual(colors.size, 8);
+  assert.strictEqual(colors.size, 14);
 });
 
 test('splash damage is full at center and zero outside the radius', () => {
@@ -159,6 +161,19 @@ test('ground lookup finds the highest surface under a point', () => {
   assert.strictEqual(C.groundAt(boxes, 0, 0, 5).y, 2);
   assert.strictEqual(C.groundAt(boxes, 0, 0, 1).y, 0);
   assert.strictEqual(C.groundAt(boxes, 99, 0, 5), null);
+});
+
+test('charged damage, spin-up and bounce helpers', () => {
+  const r = C.WEAPONS.rail;
+  assert.strictEqual(C.chargedDamage(r, 0), r.damageMin);
+  assert.strictEqual(C.chargedDamage(r, 1), r.damage);
+  const sp = C.WEAPONS.spin;
+  assert.strictEqual(C.shotInterval(sp, 0), sp.spinStartInterval);
+  assert.ok(Math.abs(C.shotInterval(sp, 1) - sp.fireInterval) < 1e-9);
+  assert.strictEqual(C.shotInterval(C.WEAPONS.laser, 0), C.WEAPONS.laser.fireInterval);
+  const v = C.reflect({ x: 3, y: -4, z: 0 }, { x: 0, y: 1, z: 0 }, 0.5);
+  assert.deepStrictEqual(v, { x: 1.5, y: 2, z: 0 });
+  assert.strictEqual(C.projectileLife(C.WEAPONS.bubble), C.WEAPONS.bubble.life);
 });
 
 console.log(`\n${passed} passed${process.exitCode ? ', some FAILED' : ''}`);

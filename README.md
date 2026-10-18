@@ -1,14 +1,14 @@
-# Blast Arena
+# Ben Zone
 
 A colorful, cartoon-style 3D arena blaster for iPhone, iPad and desktop. Original game by Say Studios LLC.
 
-**Current build: Phase 3 — online multiplayer (quick match, private rooms, friends, rankings) plus everything from Phase 2 offline vs bots.**
+**Current build: Phase 3 + weapon pack 2 — online multiplayer (quick match, private rooms, friends, rankings) plus everything from Phase 2 offline vs bots.**
 
 ## What's in the game
 
 **Modes:** 1v1 Duel (first to 5), Free-for-All (6 players, first to 12), 2v2 / 3v3 / 5v5 Team (Blue vs Orange, first team to 10 / 15 / 25), Target Practice (60 s, all 8 weapons). Matches run 3–5 minutes with quick respawns and a Rematch button.
 
-**Weapons** (pick two in **Loadout**; Practice gives you all eight):
+**Weapons** (pick two in **Loadout**; Practice gives you all 14). Everyone starts with **150 health**:
 
 | Weapon | Type | Feel |
 |---|---|---|
@@ -20,6 +20,12 @@ A colorful, cartoon-style 3D arena blaster for iPhone, iPad and desktop. Origina
 | Rapid-Fire Blaster | Instant beam | 40-shot mag, fast fire |
 | Rocket Launcher | Projectile | Big splash, knockback, rocket jumps |
 | Energy Bow | Charged projectile | Hold to draw, release; stronger and faster at full charge |
+| Burst Blaster | Instant beam | 3-shot bursts per trigger pull, mid range |
+| Frost Beam | Instant beam | Each hit slows the target to half speed for 1.4 s |
+| Bounce Bomb | Bouncing projectile | Ricochets off floors and walls up to 3 times, explodes on contact or after 1.6 s |
+| Bubble Blaster | Projectile stream | Fast stream of floating bubbles, short range |
+| Spin Blaster | Instant beam | Fire rate ramps up over 1 s while held; you move slower while spinning |
+| Rail Charger | Charged beam | Hold to charge, release; passes through every enemy in a line |
 
 Each has its own damage, range falloff, spread, aim spread, recoil, fire rate, mag size, reload time, tracer/projectile look and sound. Bigger hitters are slower, so nothing dominates.
 
@@ -91,9 +97,9 @@ npm start                # game + multiplayer server on http://localhost:8080
 Open `http://localhost:8080` in two browser windows (or a phone and a computer on the same Wi-Fi using `http://<your-computer's-LAN-IP>:8080`), tap **Play Online** in both, create a room in one and join with the code in the other.
 
 ```bash
-npm test                 # 18 rules tests + 25 server tests over real WebSockets
+npm test                 # 19 rules tests + 30 server tests over real WebSockets
 npm i -D playwright && npx playwright install chromium
-npm run smoke            # offline: all 4 maps, 3v3 and 5v5 with bots, all 8 weapons, Loadout, Locker, server/client map match
+npm run smoke            # offline: all 4 maps, 3v3 and 5v5 with bots, all 14 weapons, Loadout, Locker, server/client map match
 npm run e2e              # online: a browser joins a real server and plays a full match
 ```
 
@@ -103,14 +109,14 @@ npm run e2e              # online: a browser joins a real server and plays a ful
 |---|---|---|---|
 | Move | WASD / arrows | Left thumb (floating stick) | Left stick |
 | Look | Mouse | Drag right side / drag from FIRE | Right stick |
-| Fire (hold to charge bow) | Left click | FIRE (either side) | RT |
+| Fire (hold to charge bow/rail) | Left click | FIRE (either side) | RT |
 | Aim / scope | Right click (hold) | AIM (toggle) | LT |
 | Sprint | Shift | Push stick fully | L3 / full stick |
 | Jump / double jump | Space | JUMP | A |
 | Crouch / slide | C or Ctrl | SLIDE | B |
 | Dash | Q or E | DASH | LB / RB |
 | Reload | R | ↻ | X |
-| Swap weapon | 1–8, mouse wheel | SWAP | Y |
+| Swap weapon | 1–9, 0, mouse wheel | SWAP | Y |
 | Pause | P / Esc | ❚❚ | Start |
 
 ## GitHub setup
@@ -118,7 +124,7 @@ npm run e2e              # online: a browser joins a real server and plays a ful
 ```bash
 cd blast-arena
 git init -b main
-git add . && git commit -m "Blast Arena: initial import"
+git add . && git commit -m "Ben Zone: initial import"
 gh repo create saystudios/blast-arena --private --source . --push
 ```
 
@@ -189,7 +195,7 @@ Requires a Mac with Xcode and an Apple Developer account.
 
 ```bash
 npm i @capacitor/core @capacitor/cli @capacitor/ios
-npx cap init "Blast Arena" com.saystudios.blastarena --web-dir www
+npx cap init "Ben Zone" com.saystudios.benzone --web-dir www
 # copy index.html and src/ into www/ (Phase 5 adds a build step that does this)
 # set <meta name="blast-server" content="your-app.fly.dev"> in www/index.html so the app knows your server
 npx cap add ios
